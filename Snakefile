@@ -81,7 +81,7 @@ plink --keep-allele-order --allow-no-sex \
 
 
 '''
-Make list of cases from LZ to exclude.
+Make list of NIA-LOAD cases from LZ to exclude.
 This is because of potential overlap with ADGC
 '''
 
@@ -122,7 +122,7 @@ plink --keep-allele-order --allow-no-sex --threads 8 --memory 30000 \
 
 
 '''
-Exclude cases from LZ genotypes.
+Exclude NIA-LOAD cases from LZ genotypes.
 This is because of potential overlap with ADGC
 '''
 
