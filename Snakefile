@@ -46,7 +46,6 @@ rule prepare_phenos:
     input:
         lz = '../phenotype4brian.txt',
         adgc = rules.filter_ADGC.output.pheno,
-        PCA = '/dev/null',
         lz_cases = 'input/cases.irem'
     output:
         phenos = 'merged/phenotypes.tsv',

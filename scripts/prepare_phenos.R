@@ -57,14 +57,8 @@ adgc_phenos <- read_tsv(snakemake@input[["adgc"]], col_types = adgc_cols) %>%
   select(-contains("PC"), -contains("pc"), -contains("age"), -contains("famfile")) %>%
   mutate(consortium = "ADGC")
 
-
-#PCA <- read_tsv(snakemake@input[["PCA"]],
-#  col_types = cols(.default = "d", FID = "c", IID = "c"))
-
 "Merging and further processing phenotypes" %>% message
 phenos <- bind_rows(adgc_phenos, yun_phenos) %>%
-  #left_join(PCA, by = c("FID", "IID")) %>%
-  #filter(!is.na(jointPC1)) %>%
   rename(all_status = status) %>%
   mutate(status = prs_status(aaoaae2, all_status),
          status_under = prs_status_under90(aaoaae2, all_status)) %>%
