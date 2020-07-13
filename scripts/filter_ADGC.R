@@ -31,7 +31,16 @@ message("Has phenotypes:")
 p_withpheno %>% mk_ikeep("ikeep_withIGAP")
 
 message("Has phenotypes and passes QC:")
-p_QCpass <- p_withpheno %>% filter(!rel_omit & !QC_omit)
+
+noremrel <- c( #do not remove samples that are related to future studies
+  "ADC4-NACC897662", "ADC4-NACC813784", "ADC5-NACC447248", "ADC6-NACC623541",
+  "ADC7-NACC817085", "ADC7-NACC008802", "ADC7-NACC064202", "ADC7-NACC323196"
+)
+extraremrel <- c("ADC7-NACC407705", "WHICAP-RM0135", "WHICAP-RX0174")
+
+p_QCpass <- p_withpheno %>% filter(
+  ((!rel_omit & !QC_omit) | IID %in% noremrel) & !(IID %in% extraremrel)
+)
 p_QCpass %>% mk_ikeep("ikeep_withIGAP_qc")
 
 ## Not in Lambert
@@ -61,4 +70,3 @@ p_QCpass_noIGAP %>%
   count(APOE) %>%
   mutate(APOE = as.character(APOE)) %>%
   add_row(APOE = "total", n = sum(.$n))
-
