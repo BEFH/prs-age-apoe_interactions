@@ -266,33 +266,47 @@ rule fix_ids:
 rule missingness:
     input: rules.fix_ids.output
     output:
-        missingrep = 'merged/genos_cr95diff.missing',
-        passvars = 'merged/genos_cr95diff.keep'
+        expand('merged/genos_highcall.{ext}', ext=BPLINK)
     params:
         ins = rules.fix_ids.params.out_,
-        out_ = 'merged/genos_cr95diff'
+        out_ = 'merged/genos_highcall'
     conda: 'rpyenv.yaml'
     shell:
         r"""
 plink --keep-allele-order --bfile {params.ins} \
  --geno 0.05 --hwe 1e-6 'midp' --make-bed \
  --out {params.out_}
+"""
+
+rule missingness_diff:
+    input: rules.missingness.output
+    output:
+        missingrep = 'merged/genos_cr95diff.missing',
+        failvars = 'merged/genos_cr95diff.exclude'
+    params:
+        ins = rules.missingness.params.out_,
+        out_ = 'merged/genos_cr95diff'
+    conda: 'rpyenv.yaml'
+    shell:
+        r"""
+plink --keep-allele-order --bfile {params.ins} \
+ --test-missing 'midp' --out {params.out_}
 sed -r 's/[[:blank:]]+/ /g;s/^\s|\s$//g' {output.missingrep} |
-  awk '$5 > 1e-4 {{print $2}}' > {output.passvars}
+  awk '$5 < 1e-4 {{print $2}}' > {output.failvars}
 """
 
 rule missingness_filt:
     input:
-        geno = rules.fix_ids.output,
-        keep = rules.missingness.output.passvars
+        geno = rules.missingness.output,
+        excl = rules.missingness_diff.output.failvars
     output: multiext('merged/CR95_noDiffMiss', '.bed', '.bim', '.fam')
     params:
-        ins = rules.fix_ids.params.out_,
+        ins = rules.missingness.params.out_,
         out_ = 'merged/CR95_noDiffMiss'
     conda: 'rpyenv.yaml'
     shell:
         """
-plink --keep-allele-order --bfile {params.ins} --extract {input.keep} \
+plink --keep-allele-order --bfile {params.ins} --exclude {input.excl} \
  --make-bed --out {params.out_}
 """
 
