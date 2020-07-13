@@ -398,8 +398,8 @@ gwasdir = '../APOEe3_full_pipeline_rerun_superaged/partitioned'
 gwas = {'noAPOE': gwasdir + '/allstats_1mb_noAPOE.tsv.gz',
         'withAPOE': gwasdir + '/allstats.1mb.tsv.gz'}
 
-prscov = {'noAPOE':  '@jointPC[1-10],sex',
-          'withAPOE': '@jointPC[1-10],sex,APOE --cov-factor APOE'}
+prscov = {'withAPOE': '@jointPC[1-10],sex',
+          'noAPOE': '@jointPC[1-10],sex,APOE --cov-factor APOE'}
 
 def pcol(wildcards):
     if wildcards.prsset == 'superagers':
