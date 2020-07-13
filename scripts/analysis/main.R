@@ -22,6 +22,21 @@ owd <- getwd()
 load(scoresfile)
 setwd(wdir)
 
+capt <- . %>% capture.output(file = statsfile, append = T, split = T)
+msgcapt <- function(msg) {
+  padded <- sprintf("%s\n\n", msg)
+  cat(padded, file = statsfile, append = T)
+  cat(padded)
+}
+capt_only <- . %>% sprintf("%s\n\n", .) %>% cat(file = statsfile, append = T)
+sumcapt <- . %>% summary %>% capt
+
+opencon <- function(fname) {
+  if (file.exists(fname)) file.remove(fname)
+  a <- file.create(fname)
+  file(fname, open = "wt")
+}
+
 if (sens == "agesensitivity") {
   deaths <- paste0("/sc/arion/projects/LOAD/Data/ADGC/ADGC_2018/",
     "Brian_pipeline_withfamily_and_adc8/ADGC.phenotypes.withexclusions.tsv") %>%
@@ -36,6 +51,9 @@ if (sens == "agesensitivity") {
   scores_std %<>% simple_ages
 }
 
+# %% Figure 1
+statsfile <- opencon("stats/fig1stats.txt")
+
 residualize <- function(scores_std) {
   confound_model <- lm(PRS_1e_minus05 ~ sex + jointPC1 + jointPC2 + jointPC3 +
     jointPC4 + jointPC5 + jointPC6 + jointPC7 + jointPC8 + jointPC9 + jointPC10,
@@ -43,16 +61,9 @@ residualize <- function(scores_std) {
   mutate(scores_std, residualized = predict(confound_model) %>% unlist)
 }
 
-capt <- . %>% capture.output(file = fig1stats, append = T, split = T)
-sumcapt <- . %>% summary %>% capt
-
 #run ANOVA and pairwise t-tests
-
 message("residualized PRS")
-
-system(
-  'printf "Fig 1a:\n\n\nresidualized PRS\n\n" > stats/fig1stats.txt')
-fig1stats <- "stats/fig1stats.txt"
+capt_only("Fig 1a:\n\n\nresidualized PRS")
 
 residualized <- residualize(scores_std)
 
@@ -60,12 +71,13 @@ residualized %$%
   aov(residualized ~ status_superage) %>%
   sumcapt
 
-cat("\nPairwise comparisons using t-tests wiht pooled SD:\n\n") %>% capt
+msgcapt("\nPairwise comparisons using t-tests wiht pooled SD:")
 ttests <- residualized %>%
   filter(!is.na(status_superage)) %>%
   pairwise_t_test(residualized ~ status_superage,
-    pool.sd = T, p.adjust.method = "bonferroni") %T>%
-  capt
+    pool.sd = T, p.adjust.method = "bonferroni")
+
+ttests %>% kable %>% capt
 
 ttests_plot <- ttests %>% unite("pair", group2, group1, sep = " vs. ")
 
@@ -97,8 +109,8 @@ distplot <- scores %>%
   scale_fill_manual(values = c(
     case = "#785EF0", "89- control" = "#DC267F", "90+ control" = "#FE6100"))
 
-ggsave("plots/prsdists.png", plot = distplot)
-ggsave("plots/prsdists.pdf", plot = distplot)
+ggsave("plots/prsdists.png", plot = distplot, width = 7, height = 7)
+ggsave("plots/prsdists.pdf", plot = distplot, width = 7, height = 7)
 
 
 ## OR plots
@@ -193,6 +205,14 @@ plot_oddsratios <- function(oddsratios) {
   labs(color = "OR Type")
 }
 
+#suppress warnings from dodgev
+ggsave_nododgewarn <- function(...) {
+  h <- function(w) {
+    if( any( grepl( "position_dodgev", w) ) ) invokeRestart( "muffleWarning" )
+  }
+  withCallingHandlers(ggsave(...), warning = h)
+}
+
 e4lab <- . %>%
   mutate(apoe4_carrier = ifelse(APOE %in% c(34, 44),
                                 "APOE4 Carrier", "APOE4 Non-carrier") %>%
@@ -216,10 +236,11 @@ make_oddsratios2 <- . %>%
 
 oddsratio_noagecont <- scores_std_with89 %>% make_oddsratios2
 
-oddsratio_noagecont %>% select(-lab) %>% write_tsv("stats/OR_table.tsv")
+ortab <- oddsratio_noagecont %>% select(-lab)
+ortab %>% write_tsv("stats/OR_table.tsv")
 
-system('printf "Fig 1b:\n\n\nOdds Ratios\n\n" >> stats/fig1stats.txt')
-system("cat stats/fig1stats.txt stats/OR_table.tsv")
+msgcapt("Fig 1b:\n\nOdds Ratios")
+ortab %>% kable %>% capt
 
 or_breaks <- c(0:10)
 
@@ -229,8 +250,10 @@ oddsratio_fig <- oddsratio_noagecont %>%
   scale_x_continuous(trans = log_trans(), breaks = or_breaks,
     labels = c(as.character(or_breaks)))
 
-ggsave("plots/OR_nocont.png", plot = oddsratio_fig, width = 7, height = 1.5)
-ggsave("plots/OR_nocont.pdf", plot = oddsratio_fig, width = 7, height = 1.5)
+ggsave_nododgewarn("plots/OR_nocont.png",
+  plot = oddsratio_fig, width = 7, height = 1.5)
+ggsave_nododgewarn("plots/OR_nocont.pdf",
+  plot = oddsratio_fig, width = 7, height = 1.5)
 
 make_oddsratios_strat <- function(df, stratum) {
   make_oddsratios2(df) %>%
@@ -250,9 +273,9 @@ oddsratio_fig_strat <- oddsratio_noagecont_strat %>%
     labels = c(as.character(or_breaks))) +
   facet_grid(Stratum ~ .)
 
-ggsave("plots/OR_strat.png",
+ggsave_nododgewarn("plots/OR_strat.png",
   plot = oddsratio_fig_strat, width = 7, height = 3)
-ggsave("plots/OR_strat.pdf",
+ggsave_nododgewarn("plots/OR_strat.pdf",
   plot = oddsratio_fig_strat, width = 7, height = 3)
 
 fig1 <- gridExtra::arrangeGrob(
@@ -264,11 +287,18 @@ fig1 <- gridExtra::arrangeGrob(
    c(1),
    c(2)))
 
-ggsave("plots/fig1.png", fig1, width = 7, height = 7)
-ggsave("plots/fig1.pdf", fig1, width = 7, height = 7)
+ggsave_nododgewarn("plots/fig1.png", fig1, width = 7, height = 7)
+ggsave_nododgewarn("plots/fig1.pdf", fig1, width = 7, height = 7)
 
+close(statsfile)
 
-# Figure 2
+# %% Figure 2
+
+statsfile <- opencon("stats/fig2stats.txt")
+
+msgcapt("Figure 2")
+msgcapt("Figure 2a")
+msgcapt("Age is significant for status:")
 
 apcommon <- scores_std %>%
   e4lab %>%
@@ -284,8 +314,8 @@ ageplot <- apcommon %>%
   theme_bw() + facet_grid(~apoe4_carrier) +
   scale_color_manual(values = c(case = "#DC3220", control = "#005AB5"))
 
-ggsave("plots/ageplot.png", plot = ageplot)
-ggsave("plots/ageplot.pdf", plot = ageplot)
+ggsave("plots/ageplot.png", plot = ageplot, height = 7, width = 7)
+ggsave("plots/ageplot.pdf", plot = ageplot, height = 7, width = 7)
 
 
 ageplot2 <- apcommon %>%
@@ -295,31 +325,23 @@ ageplot2 <- apcommon %>%
   ggtitle("(a) Effect of age and APOE on PRS") +
   theme_bw() + facet_grid(~apoe4_carrier)
 
-fig2stats <- "stats/fig2stats.txt"
-file.create(fig2stats)
-write(c("Figure 2\n\n", "Figure 2a\n", "Age is significant for status:\n"),
-  file = fig2stats, append = T)
-
-capt <- . %>% capture.output(file = fig2stats, append = T, split = T)
-sumcapt <- . %>% summary %>% capt
-
 lm(PRS_1e_minus05 ~ aaoaae2 + APOE + sex + jointPC1 + jointPC2 + jointPC3 +
   jointPC4 + jointPC5 + jointPC6 + jointPC7 + jointPC8 + jointPC9 + jointPC10,
   data = scores_std) %>%
     sumcapt
 
-write(c("\nEven when accounting for case-control status\n"),
-  file = fig2stats, append = T)
+msgcapt("Even when accounting for case-control status")
 age_lm <- lm(PRS_1e_minus05 ~ aaoaae2 + APOE + all_status + sex +
   jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 + jointPC7 +
   jointPC8 + jointPC9 + jointPC10, data = scores_std)
 age_lm %>% sumcapt
 
-write(c("\nNo colinearity:\n"), file = fig2stats, append = T)
+msgcapt("No colinearity:")
 age_lm %>%
   vif %>%
   as_tibble(rownames = "coef") %>%
-  write_tsv(fig2stats, append = T, col_names = T)
+  kable %>%
+  capt
 
 age_strat <- scores_std %>%
   mutate(E4strat = ifelse(APOE %in% c(34, 44), "APOE4 carrier",
@@ -338,22 +360,21 @@ ctrl_age_strat <- age_strat %>%
 case_age <- scores_std %>%
   filter(all_status10 == 1)
 
-write(c("\n\n\nFig 2b: Case Associations:\n\n",
-  "Age is associated with PRS:\n"), file = fig2stats, append = T)
+msgcapt("\n\nFig 2b: Case Associations:")
+msgcapt("Age is associated with PRS:")
 lm(PRS_1e_minus05 ~ aaoaae2 + E4strat + sex + jointPC1 + jointPC2 + jointPC3 +
   jointPC4 + jointPC5 + jointPC6 + jointPC7 + jointPC8 + jointPC9 + jointPC10,
   data = case_age_strat) %>%
     sumcapt
 
-write(c("\nInteraction: Age is associated with PRS in E4 only:\n"),
-  file = fig2stats, append = T)
+msgcapt("Interaction: Age is associated with PRS in E4 only:")
 prs_age_lm_strat <- lm(PRS_1e_minus05 ~ aaoaae2 * E4strat + sex + jointPC1 +
   jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 + jointPC7 + jointPC8 +
   jointPC9 + jointPC10, data = case_age_strat)
 prs_age_lm_strat %>% sumcapt
 
 ## YUN PUT T-TESTS HERE ##
-write("T-test with all samples", file = fig2stats, append = T)
+msgcapt("T-test with all samples")
 
 cases333444 <- age_strat %>%
   mutate(SCORE = PRS_1e_minus05) %>%
@@ -369,7 +390,7 @@ ttestalle4case <- t.test(bottom_ages_e4, top_ages_e4)
 
 ttestalle4case %>% capt
 
-write("T-test with e3e4 samples", file = fig2stats, append = T)
+msgcapt("T-test with e3e4 samples")
 cases34 <- casese4 %>% filter(APOE == 34)
 
 
@@ -380,16 +401,14 @@ tteste3e4case <- t.test(bottom_ages_e3e4, top_ages_e3e4)
 
 tteste3e4case %>% capt
 
-write(c("\n\n\nFig 2c: Control Associations:\n\n",
-  "Age is associated with PRS:\n"),
-  file = fig2stats, append = T)
+msgcapt("\n\nFig 2c: Control Associations:")
+msgcapt("Age is associated with PRS:")
 lm(PRS_1e_minus05 ~ aaoaae2 + E4strat + sex + jointPC1 + jointPC2 + jointPC3 +
   jointPC4 + jointPC5 + jointPC6 + jointPC7 + jointPC8 + jointPC9 + jointPC10,
   data = ctrl_age_strat) %>%
     sumcapt
 
-write(c("\nInteraction: There is no interaction in controls:\n"),
-  file = fig2stats, append = T)
+msgcapt("\nInteraction: There is no interaction in controls:")
 prs_age_lm_strat_ctrl <- lm(PRS_1e_minus05 ~ aaoaae2 * E4strat + sex +
   jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 + jointPC7 +
   jointPC8 + jointPC9 + jointPC10, data = ctrl_age_strat)
@@ -441,18 +460,16 @@ status_glm <- glm(all_status10 ~ aaoaae2 + PRS_1e_minus05 + E4strat + sex +
   jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 + jointPC7 +
   jointPC8 + jointPC9 + jointPC10, data = age_strat)
 
-write(c("\n\n\nOveral AD status associations:\n\n",
-  "All associated with status:\n"),
-  file = fig2stats, append = T)
+msgcapt("\n\nOveral AD status associations:")
+msgcapt("All associated with status:")
 status_glm %>% sumcapt
-write(c("Associations depend on interactions:\n"), file = fig2stats, append = T)
+msgcapt("Associations depend on interactions:")
 status_glm_sa %>% sumcapt
 
-write(c("\nNo colinearity:\n"), file = fig2stats, append = T)
-status_glm %>% vif %>% as_tibble(rownames = "coef") %>%
-  write_tsv(fig2stats, append = T, col_names = T)
+msgcapt("No colinearity:")
+status_glm %>% vif %>% as_tibble(rownames = "coef") %>% kable %>% capt
 
-# Supplements
+# %% Supplements
 
 ## Threshold plot
 
