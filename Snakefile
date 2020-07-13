@@ -11,6 +11,7 @@ wildcard_constraints:
 adgc_stem = ('/sc/arion/projects/LOAD/Data/'
              'ADGC/ADGC_2018/Brian_pipeline_withfamily_and_adc8')
 
+localrules: all, download_progs
 
 rule all:
     input:
@@ -25,6 +26,26 @@ rule all:
 Filter ADGC phenotypes to new cohorts since Lambert et al. 2013
 Output phenotypes and list of samples to keep.
 '''
+
+plink2 = 'http://s3.amazonaws.com/plink2-assets/alpha2/plink2_linux_avx2.zip'
+prsice = ('https://github.com/choishingwan/PRSice/releases/download/2.2.11/'
+          'PRSice_linux.zip')
+
+rule download_progs:
+    output:
+        plink2 = "plink2",
+        prsice = "PRSice",
+        prsicer = "PRSice.R"
+    shell:
+        """
+wget -O plink2.zip {plink2}
+unzip plink2.zip
+rm plink2.zip
+wget -O PRSice_linux.zip {prsice}
+unzip PRSice_linux.zip PRSice_linux PRSice.R
+mv PRSice_linux PRSice
+rm PRSice_linux.zip
+"""
 
 rule filter_ADGC:
   input: adgc_stem + '/ADGC_withAllPCs.withADSPexclusions.pheno.tsv'
@@ -200,7 +221,9 @@ flippyr -p --plinkMem 20000 \
 
 # Recode subcohort plink file to vcf
 rule Plink2vcf:
-    input: rules.Flip.output
+    input:
+        rules.Flip.output,
+        "Plink2"
     output: temp('premerge/{cohort}+flipped.vcf.gz')
     params:
         indat = 'premerge/{cohort}_flipped',
@@ -234,7 +257,9 @@ bcftools annotate --threads 2 --set-id '%CHROM:%POS:%REF:%FIRST_ALT' -Oz -o {out
 
 # Make merged plink files
 rule plink:
-    input: rules.merge.output
+    input:
+        rules.merge.output,
+        "Plink2"
     output: temp(expand('merged/genos_vcfid.{ext}', ext=BPLINK))
     params:
         out_ = 'merged/genos_vcfid'
@@ -412,7 +437,8 @@ rule do_prs:
     input:
         genotypes = rules.missingness_filt.output,
         phenotypes = 'merged/phenotypes_withJointPCs.tsv',
-        gwas = lambda wildcards: gwas[wildcards.apoerem]
+        gwas = lambda wildcards: gwas[wildcards.apoerem],
+        PRSice = "PRSice"
     params:
         phenocol = pcol,
         inplink = rules.missingness_filt.params.out_,
