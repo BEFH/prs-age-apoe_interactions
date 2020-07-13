@@ -1,0 +1,20 @@
+__default__:
+  project: acc_LOAD
+  partition: bode
+  queue: premium
+  cores: 2
+  mem: 5200
+  time: '24:00'
+PopulationStratification:
+  cores: 10
+  mem: 2048
+Flip:
+  cores: 1
+  mem: 20000
+Plink2vcf:
+  time: '3:00'
+merge:
+  time: '72:00'
+  cores: 6
+plink:
+  cores: 6

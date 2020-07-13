@@ -1,0 +1,7 @@
+ref: /sc/arion/projects/LOAD/Brian/fasta/hg19.fa
+
+modules:
+  plink: "plink/1.90b6.10"
+  bcftools: "bcftools/1.9"
+  R: "R/3.6.3"
+  king: king/2.2.5

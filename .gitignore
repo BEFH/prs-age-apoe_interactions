@@ -1,0 +1,11 @@
+.snake*
+input/
+output/
+data/
+logs/
+merged/
+PCA/
+plots/
+premerge/
+testing/
+deprecated/
