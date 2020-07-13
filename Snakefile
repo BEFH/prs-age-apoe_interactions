@@ -75,7 +75,7 @@ rule filter_ADGC_genos:
         """
 plink --keep-allele-order --allow-no-sex \
  --bfile {params.inplink} --keep {input.ikeep} \
- --hwe 1e-10 midp --geno 0.05 \
+ --hwe 1e-10 'midp' --geno 0.05 \
  --make-bed --out {params.outplink}
 """
 
@@ -275,7 +275,7 @@ rule missingness:
     shell:
         r"""
 plink --keep-allele-order --bfile {params.ins} \
- --geno 0.05 --hwe midp 1e-6 --test-missing midp \
+ --geno 0.05 --hwe 1e-6 'midp' --make-bed \
  --out {params.out_}
 sed -r 's/[[:blank:]]+/ /g;s/^\s|\s$//g' {output.missingrep} |
   awk '$5 > 1e-4 {{print $2}}' > {output.passvars}
