@@ -2,16 +2,16 @@
 
 pacman::p_load(dplyr, readr, tidyr, magrittr, broom, forcats, purrr, car,
                ggplot2, viridis, ggsignif, scales, pROC, sjPlot, sjmisc,
-               rstatix)
+               rstatix, ggstance, knitr)
 
 if (exists("snakemake")) {
-  scoresfile <- snakemake@inputs[["scores"]]
+  scoresfile <- snakemake@input[["scores"]]
   wdir <- snakemake@params[["outdir"]]
   thresh_standard <- snakemake@input[["thresh_standard"]]
   thresh_superager <- snakemake@input[["thresh_superager"]]
   sens <- snakemake@wildcards[["sensitivity"]]
 } else {
-  scoresfile <- "scores+phenos_noAPOE.Rdata"
+  scoresfile <- "output/scores+phenos_noAPOE.Rdata"
   wdir <- "testing"
   thresh_standard <- "output/PRS_noAPOE_nonorthwell.prsice"
   thresh_superager <- "output/PRS_noAPOE_superagers.prsice"
@@ -473,6 +473,8 @@ status_glm %>% vif %>% as_tibble(rownames = "coef") %>% kable %>% capt
 
 ## Threshold plot
 
+setwd(owd)
+
 prs_superager <- read_tsv(
   thresh_superager,
   col_types = "-dddddi") %>%
@@ -482,6 +484,8 @@ prs_standard <- read_tsv(
   thresh_standard,
   col_types = "-dddddi") %>%
   mutate(optimization = "standard")
+
+setwd(wdir)
 
 thresholds <- bind_rows(prs_superager, prs_standard)
 
@@ -502,7 +506,6 @@ ggsave("PRSdists_byconsortium_10e-5_rerun.png")
 
 ## ROCs
 
-setwd(owd)
 
 ROCs <- list(standard = roc(predictor = scores$PRS_1e_minus05,
                             response = scores$all_status10),
@@ -515,8 +518,6 @@ ROCsp <- list(standard = roc(predictor = scores$PRS_1e_minus05,
              superager = roc(predictor = scores$PRS_1e_minus05,
                              response = scores$status10,
                              partial.auc = c(1, 0.75)))
-
-setwd(wdir)
 
 ROCsp
 
