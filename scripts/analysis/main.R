@@ -79,7 +79,10 @@ ttests <- residualized %>%
 
 ttests %>% kable %>% capt
 
-ttests_plot <- ttests %>% unite("pair", group2, group1, sep = " vs. ")
+ttests_plot <- ttests %>%
+  unite("pair", group2, group1, sep = " vs. ") %>%
+  mutate(p.adj.signif = ifelse(
+    p.adj.signif == "****", "***", p.adj.signif))
 
 get_signif <- function(x) {
   ttests_plot %>%
@@ -87,7 +90,7 @@ get_signif <- function(x) {
     pull(p.adj.signif)
 }
 
-offset <- 0.011
+offset <- 0.006
 distance <- 0.001
 
 distplot <- scores %>%
