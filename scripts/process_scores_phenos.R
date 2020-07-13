@@ -5,7 +5,8 @@ library(magrittr)
 phenos <- read_tsv(snakemake@input[["phenos"]], guess_max = 100000)
 rawscores <- read_table2(snakemake@input[["scores"]], guess_max = 50000)
 
-names(rawscores)[!(names(rawscores) %in% c("FID", "IID"))] %<>% stringr::str_replace("-", "_minus") %>% paste0("PRS_", .)
+names(rawscores)[!(names(rawscores) %in% c("FID", "IID"))] %<>%
+  stringr::str_replace("-", "_minus") %>% paste0("PRS_", .)
 
 # function to add pheno columns
 modscores <- . %>%
