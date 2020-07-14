@@ -1,17 +1,18 @@
 ---
 title: "Main Analyses"
 author: "Brian Fulton-Howard, Robert Adelson, Alison Goate, Yun Freudenberg"
-date: "7/13/2020"
+date: "7/14/2020"
 output:
   rmarkdown::html_document:
     theme: spacelab
+  word_document: default
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 pacman::p_load(dplyr, readr, tidyr, magrittr, broom, forcats, purrr, car,
                ggplot2, viridis, ggsignif, scales, pROC, sjPlot, sjmisc,
-               rstatix, ggstance, knitr, here, stringr, gtsummary)
+               rstatix, ggstance, knitr, here, stringr, flextable, gtsummary)
 
 if (exists("snakemake")) {
   scoresfile <- snakemake@input[["scores"]]
@@ -30,11 +31,11 @@ if (exists("snakemake")) {
 #printmod <- function (...) tab_model(..., digits = 4, emph.p = T, p.style= "scientific_stars", digits.p = 2)
 if (!is_html_output()) knitr::opts_chunk$set(dpi=300)
 
-wordcompat <- function(x) {
+wordcompat <- function(x, kabletab = F) {
   if (is_html_output()) {
     x
   } else {
-    as_flextable(x)
+    gtsummary::as_flextable(x) %>% set_table_properties(width = 1, layout = "autofit") %>% fontsize(part = "all", size = 8)
   }
 }
 
@@ -42,11 +43,11 @@ fs <- Vectorize(function(x) {
     if (is.na(x)) {
       ""
     } else if (x < 0.001) {
-      sprintf("%s ***", scientific(x, 1))
+      sprintf("%s ***", scientific(x, 2))
     } else if (x == 0.001) {
-      sprintf("%.3f ***", x)
+      sprintf("%s ***", scientific(x, 2))
     } else if (x < 0.01) {
-      sprintf("%.3f ** ", x)
+      sprintf("%s ** ", scientific(x, 2))
     } else if (x < 0.05) {
       sprintf("%.3f *  ", x)
     } else {
@@ -54,17 +55,43 @@ fs <- Vectorize(function(x) {
     }
 })
 
-printmod <- function (...) {
-  #fs <- function(x) ifelse(x < 0.001, scientific(x, 1), sprintf("%.3f", x))
-  if (...length() == 2) {
-    t1 = tbl_regression(..1, pvalue_fun = fs)
-    t2 = tbl_regression(..2, pvalue_fun = fs)
-    tbl_merge(
-      tbls = list(t1, t2),
-      tab_spanner = c("**Without interactions**", "**With interactions**")
-    ) %>% wordcompat
+scientific_if_small <- function(x) ifelse(abs(x) < 1e-2, scientific(x, 2), sprintf("%.2f", x))
+
+printmod <- function (..., model_names = "default") {
+  mktb <- function(x) tbl_regression(x, pvalue_fun = fs, estimate_fun = scientific_if_small)
+  if (...length() > 1) {
+    mods <- list(...)
+    modnames <- c("**M1: Without interactions**", "**M2: With interactions**")
+    if(model_names[1] != "default") modnames <- model_names
+    tbl_merge(tbls = lapply(mods, mktb), tab_spanner = modnames) %>% wordcompat
   } else {
-    tbl_regression(..1, pvalue_fun = fs) %>% wordcompat
+    mktb(..1) %>% wordcompat
+  }
+}
+
+printmod_overall <- function(..., model_names = "default") {
+  if (...length() > 1) {
+    mods <- list(...)
+    modnames <- c("**M1: Without interactions**", "**M2: With interactions**")
+    if(model_names[1] != "default") modnames <- model_names
+    overall <- mods %>%
+      lapply(glance) %>%
+      bind_rows %>%
+      mutate(Model = modnames) %>%
+      select(Model, everything())
+  } else {
+    overall <- glance(..1)
+  }
+  remlist = c("logLik", "AIC", "BIC", "deviance")
+  if (!("glm" %in% class(..1))) remlist %<>% c("sigma", "statistic")
+  tab<- overall %>%
+    select(-!!remlist) %>%
+    rename(N = nobs) %>%
+    mutate_if(function(x) all(is.numeric(x)) && any(x%%1!=0), scientific_if_small) 
+  if (is_html_output()) {
+    kable(tab)
+  } else {
+    flextable(tab) %>% autofit() %>% fontsize(part = "all", size = 8)
   }
 }
 
@@ -78,7 +105,9 @@ saveplot <- function(output, ...) {
 
 load(here(scoresfile))
 
+sensitivity = "Not performing sensitivity analysis"
 if (sens == "agesensitivity") {
+  sensitivity = "Performing sensitivity analysis on age"
   deaths <- paste0("/sc/arion/projects/LOAD/Data/ADGC/ADGC_2018/",
     "Brian_pipeline_withfamily_and_adc8/ADGC.phenotypes.withexclusions.tsv") %>%
     read_tsv(col_types = cols_only(FID = "c", IID = "c", age_death = "d"))
@@ -94,7 +123,7 @@ if (sens == "agesensitivity") {
 
 prettyvar <- . %>%
   rename(age = aaoaae2) %>%
-  rename_all(funs(str_replace(., "jointPC", "PC")))
+  rename_all(~str_replace(., "jointPC", "PC"))
 scores %<>% prettyvar
 scores_std %<>% prettyvar
 
@@ -105,11 +134,13 @@ e4lab <- . %>%
          factor(levels = c("APOE4 Non-carrier", "APOE4 Carrier")))
 ```
 
+`r sensitivity`
+
 # Figure 1
 
 ## PRS is significantly different across cases, 89- controls and 90+ controls
 
-There is an overall association:
+There is an overall association between the case/89-control/90+control categories and residualized PRS with ANOVA:
 
 ```{r Fig1_aov, echo=F}
 residualize <- function(scores_std) {
@@ -122,7 +153,10 @@ residualized <- residualize(scores_std)
 
 residualized %$%
   aov(residualized ~ status_superage) %>%
-  summary
+  tidy() %>%
+  rename(P = p.value, "Sum Sq" = sumsq, "F value" = statistic, "Mean Sq" = meansq) %>%
+  mutate_if(function(x) all(is.numeric(x)) && any(x%%1!=0), scientific_if_small) %>%
+  kable
 ```
 
 And each individual association is significant:
@@ -136,7 +170,7 @@ ttests <- residualized %>%
     pool.sd = T, p.adjust.method = "bonferroni") %>%
   select(-`.y.`)
 
-ttests %>% kable
+ttests %>% mutate_at(c("p", "p.adj"), scientific_if_small) %>% kable
 ```
 
 This difference in distributions is visible but small:
@@ -301,7 +335,7 @@ oddsratio_noagecont <- scores_std_with89 %>% make_oddsratios2
 ortab <- oddsratio_noagecont %>% select(-lab)
 ortab %>% write_tsv(here(sprintf("%s/stats/OR_table.tsv", wdir)))
 
-ortab %>% kable
+ortab %>% mutate_if(is.numeric, scientific_if_small) %>% kable
 ```
 
 This is especially apparent when plotted.
@@ -380,7 +414,7 @@ apcommon <- scores_std %>%
 
 ageplot <- apcommon %>%
   ggplot() + aes(x = age, y = PRS_1e_minus05, color = Status) +
-  geom_point(size = 0.01) + geom_smooth(method = "lm") +
+  geom_point(size = 0.01) + geom_smooth(method = "lm", formula = "y ~ x") +
   xlab("Age") + ylab("PRS") +
   ggtitle("(a) Effect of age and APOE on PRS") +
   theme_bw() + facet_grid(~apoe4_carrier) +
@@ -401,8 +435,13 @@ age_lm_nocc <- lm(PRS_1e_minus05 ~ age + APOE + sex +
 age_lm <- lm(PRS_1e_minus05 ~ age + APOE + all_status + sex +
   PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
   data = scores_std)
-printmod(age_lm_nocc, age_lm)
+mns <- c("M1: Without status", "M2: With status")
+printmod(age_lm_nocc, age_lm, model_names = mns)
+```
 
+Overall model information:
+```{r, echo=F}
+printmod_overall(age_lm_nocc, age_lm, model_names = mns)
 ```
 
 There is no colinearity:
@@ -434,18 +473,17 @@ case_age <- scores_std %>%
 
 stratpal <- c("#E66100", "#B45ADC")
 
-intplot_common <- function(plt) {
-  plt +
+intplot_common <- function(mod) {
+  plot_model(mod, type = "int", colors = stratpal) +
     xlab("Age") + ylab("PRS") +
     theme_bw(base_size = 8) +
-    scale_color_manual(values = stratpal) +
-    scale_fill_manual(values = stratpal) +
     coord_cartesian(ylim = c(-0.5, 0.5))
 }
 ```
 
 ### Figure 2b: Case Associations:
 Age is associated with PRS, but only in E4 carriers:
+
 ```{r, echo=F}
 lm_case_nointeract <- lm(PRS_1e_minus05 ~ age + E4strat + sex + 
   PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
@@ -458,8 +496,13 @@ lm_case_interact <- lm(PRS_1e_minus05 ~ age * E4strat + sex +
 printmod(lm_case_nointeract, lm_case_interact)
 ```
 
+Overall model information:
 ```{r, echo=F}
-case <- plot_model(lm_case_interact, type = "int") %>% intplot_common +
+printmod_overall(lm_case_nointeract, lm_case_interact)
+```
+
+```{r, echo=F, warning=F}
+case <- intplot_common(lm_case_interact) +
   ggtitle("(b) Age x APOE interaction in cases") +
   labs(color = "Stratum") +
   theme(legend.position = "bottom")
@@ -505,8 +548,13 @@ lm_ctrl_interact <- lm(PRS_1e_minus05 ~ age * E4strat + sex +
 printmod(lm_ctrl_nointeract, lm_ctrl_interact)
 ```
 
+Overall model information:
 ```{r, echo=F}
-cont <- plot_model(lm_ctrl_interact, type = "int") %>% intplot_common +
+printmod_overall(lm_ctrl_nointeract, lm_ctrl_interact)
+```
+
+```{r, echo=F, warning=F}
+cont <- intplot_common(lm_ctrl_interact)  +
   ggtitle("(c) Age x APOE interaction in controls") +
   theme(legend.position = "none")
 
@@ -515,7 +563,7 @@ cont
 
 Here is the complete Figure 2:
 
-```{r, echo=F}
+```{r, echo=F, warning=F}
 fig2 <- gridExtra::arrangeGrob(
   ageplot + theme_bw(base_size = 8) + theme(legend.position = "bottom"),
   case,
@@ -545,6 +593,11 @@ status_glm_sa <- glm(all_status10 ~ age * PRS_1e_minus05 * E4strat + sex +
 status_glm <- glm(all_status10 ~ age + PRS_1e_minus05 + E4strat + sex +
   PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = age_strat)
 printmod(status_glm, status_glm_sa)
+```
+
+Overall model information:
+```{r, echo=F}
+printmod_overall(status_glm, status_glm_sa)
 ```
 
 No colinearity:
@@ -594,7 +647,7 @@ saveplot("plots/PRSdists_byconsortium_10e-5_rerun.png", height = 4, width = 7)
 ## ROCs
 
 Here is the ROC:
-```{r, echo=F}
+```{r, echo=F, message=F}
 ROCs <- list(standard = roc(predictor = scores$PRS_1e_minus05,
                             response = scores$all_status10),
              superager = roc(predictor = scores$PRS_1e_minus05,
@@ -607,7 +660,7 @@ names(ROCs) <- sprintf("%s: AUC = %.2f", names(ROCs), lapply(ROCs, pROC::auc))
 ```
 
 And partial ROC:
-```{r, echo=F}
+```{r, echo=F, message=F}
 ROCsp <- list(standard = roc(predictor = scores$PRS_1e_minus05,
                              response = scores$all_status10,
                              partial.auc = c(1, 0.75)),
@@ -634,7 +687,7 @@ saveplot("plots/ROCs.pdf", height = 5, width = 4)
 ```
 
 ## ORs
-```{r, echo=F, fig.height=2.5, fig.width=7}
+```{r, echo=F, fig.height=2.5, fig.width=7, warning=F}
 oddsratio_agecont <- scores_std %>%
   mutate(SCORE = PRS_1e_minus05) %>%
   pivot_longer(cols = c("status10", "all_status10"),
