@@ -26,6 +26,9 @@ if (exists("snakemake")) {
   sens <- "primary"
 }
 
+if (!dir.exists(here(wdir))) dir.create(here(wdir), recursive = T)
+if (!dir.exists(here(sprintf("%s/plots", wdir)))) dir.create(here(sprintf("%s/plots", wdir)))
+if (!dir.exists(here(sprintf("%s/stats", wdir)))) dir.create(here(sprintf("%s/stats", wdir)))
 saveplot <- function(output, ...) {
   ggsave(sprintf("%s/%s", here(wdir), output), ...)
 }
