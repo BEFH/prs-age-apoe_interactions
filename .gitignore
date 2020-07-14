@@ -9,6 +9,10 @@ plots/
 premerge/
 testing/
 deprecated/
-./analysis/
+analysis/
+!scripts/analysis/
+scripts/analysis/*.html
+scripts/analysis/*.docx
 plink2
 PRSice*
+*e-*.snp
