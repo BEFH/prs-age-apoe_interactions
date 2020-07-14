@@ -264,7 +264,7 @@ rule plink:
         out_ = 'merged/genos_vcfid'
     shell:
         """
-./plink2 --vcf {input} --const-fid --make-bed \
+./plink2 --vcf {input[0]} --const-fid --make-bed \
 --real-ref-alleles --out {params.out_}"""
 
 rule fam_ref:
