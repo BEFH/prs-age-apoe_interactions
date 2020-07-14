@@ -9,6 +9,6 @@ plots/
 premerge/
 testing/
 deprecated/
-analysis/
+./analysis/
 plink2
 PRSice*
