@@ -97,6 +97,12 @@ prettyvar <- . %>%
   rename_all(funs(str_replace(., "jointPC", "PC")))
 scores %<>% prettyvar
 scores_std %<>% prettyvar
+
+
+e4lab <- . %>%
+  mutate(apoe4_carrier = ifelse(APOE %in% c(34, 44),
+                                "APOE4 Carrier", "APOE4 Non-carrier") %>%
+         factor(levels = c("APOE4 Non-carrier", "APOE4 Carrier")))
 ```
 
 # Figure 1
@@ -271,11 +277,6 @@ ggsave_nododgewarn <- function(...) {
   }
   withCallingHandlers(saveplot(...), warning = h)
 }
-
-e4lab <- . %>%
-  mutate(apoe4_carrier = ifelse(APOE %in% c(34, 44),
-                                "APOE4 Carrier", "APOE4 Non-carrier") %>%
-         factor(levels = c("APOE4 Non-carrier", "APOE4 Carrier")))
 
 scores_std_with89 <- scores_std %>%
   mutate(status_89minus = ifelse(
