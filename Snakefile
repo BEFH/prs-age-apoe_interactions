@@ -222,7 +222,7 @@ flippyr -p --plinkMem 20000 \
 rule Plink2vcf:
     input:
         rules.Flip.output,
-        "Plink2"
+        "plink2"
     output: temp('premerge/{cohort}+flipped.vcf.gz')
     params:
         indat = 'premerge/{cohort}_flipped',
@@ -258,7 +258,7 @@ bcftools annotate --threads 2 --set-id '%CHROM:%POS:%REF:%FIRST_ALT' -Oz -o {out
 rule plink:
     input:
         rules.merge.output,
-        "Plink2"
+        "plink2"
     output: temp(expand('merged/genos_vcfid.{ext}', ext=BPLINK))
     params:
         out_ = 'merged/genos_vcfid'
