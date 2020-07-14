@@ -15,7 +15,7 @@ dependencies:
   - r-stringi=1.4.6
   - r-survminer=0.4.7
   - r-survival=2.44_1.1
-  - r-sjplot=2.6.3
+  - r-sjplot=2.8.4
   - r-scales=1.0.0
   - r-ggsignif=0.6.0
   - r-proc=1.14.0
@@ -24,6 +24,7 @@ dependencies:
   - r-rstatix=0.6.0
   - r-ggstance=0.3.4
   - r-knitr=1.29
+  - r-here=0.1
   - pip
   - pip:
     - flippyr==0.4.0
