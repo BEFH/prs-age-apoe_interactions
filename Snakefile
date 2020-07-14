@@ -18,8 +18,9 @@ rule all:
         expand('output/PRS_{apoerem}_{prsset}.prsice',
                apoerem=['noAPOE', 'withAPOE'],
                prsset=['superagers', 'nonorthwell']),
-        expand('analysis/{sensitivity}/report.html',
-               sensitivity = ['agesensitivity', 'primary'])
+        expand('analysis/{sensitivity}_report.html',
+               sensitivity = ['agesensitivity', 'primary']),
+        'output/scores+phenos_withAPOE.Rdata'
 
 '''
 Filter ADGC phenotypes to new cohorts since Lambert et al. 2013
@@ -484,6 +485,6 @@ rule run_analyses:
         thresh_standard = 'output/PRS_noAPOE_nonorthwell.prsice',
     params:
         outdir = 'analysis/{sensitivity}'
-    output: "analysis/{sensitivity}/report.html"
+    output: "analysis/{sensitivity}_report.html"
     conda: 'rpyenv.yaml'
     script: 'scripts/analysis/main.Rmd' #'scripts/analysis/main.R'
