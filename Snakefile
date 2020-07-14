@@ -85,7 +85,7 @@ rule filter_ADGC_genos:
     input:
         genos = multiext(adgc_genos, '.bed', '.bim', '.fam'),
         ikeep = rules.filter_ADGC.output.ikeep_noIGAP_qc
-    output: multiext('input/ADGC', '.bed', '.bim', '.fam')
+    output: temp(multiext('input/ADGC', '.bed', '.bim', '.fam'))
     params:
         inplink = adgc_genos,
         outplink = 'input/ADGC'
@@ -149,7 +149,7 @@ rule lz_cases_geno:
     input:
         genos = rules.lz_concat.output.genos,
         irem = rules.lz_cases.output
-    output: multiext('input/lz', '.bed', '.bim', '.fam')
+    output: temp(multiext('input/lz', '.bed', '.bim', '.fam'))
     params:
         inplink = rules.lz_concat.params.outplink,
         outplink = 'input/lz'
@@ -187,7 +187,7 @@ rule overlap_filter:
         overlap = 'input/{cohort}.overlap',
         plink = multiext('input/{cohort}', '.bed', '.bim', '.fam')
     output:
-        multiext('input/{cohort}.overlapping', '.bed', '.bim', '.fam')
+        temp(multiext('input/{cohort}.overlapping', '.bed', '.bim', '.fam'))
     params:
         ins = 'input/{cohort}',
         out = 'input/{cohort}.overlapping'
@@ -277,7 +277,7 @@ rule fix_ids:
         plink = rules.plink.output,
         allfam = rules.fam_ref.output,
         phenos = rules.prepare_phenos.output.phenos
-    output: expand('merged/genos.{ext}', ext=BPLINK)
+    output: temp(expand('merged/genos.{ext}', ext=BPLINK))
     params:
         ins = rules.plink.params.out_,
         out_ = 'merged/genos',
@@ -289,7 +289,7 @@ rule fix_ids:
 rule missingness:
     input: rules.fix_ids.output
     output:
-        expand('merged/genos_highcall.{ext}', ext=BPLINK)
+        temp(expand('merged/genos_highcall.{ext}', ext=BPLINK))
     params:
         ins = rules.fix_ids.params.out_,
         out_ = 'merged/genos_highcall'
