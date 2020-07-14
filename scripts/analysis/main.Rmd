@@ -3,14 +3,15 @@ title: "Main Analyses"
 author: "Brian Fulton-Howard, Robert Adelson, Alison Goate, Yun Freudenberg"
 date: "7/13/2020"
 output:
-  html_document: default
+  rmarkdown::html_document:
+    theme: spacelab
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 pacman::p_load(dplyr, readr, tidyr, magrittr, broom, forcats, purrr, car,
                ggplot2, viridis, ggsignif, scales, pROC, sjPlot, sjmisc,
-               rstatix, ggstance, knitr, here)
+               rstatix, ggstance, knitr, here, stringr, gtsummary)
 
 if (exists("snakemake")) {
   scoresfile <- snakemake@input[["scores"]]
@@ -26,9 +27,51 @@ if (exists("snakemake")) {
   sens <- "primary"
 }
 
+#printmod <- function (...) tab_model(..., digits = 4, emph.p = T, p.style= "scientific_stars", digits.p = 2)
+if (!is_html_output()) knitr::opts_chunk$set(dpi=300)
+
+wordcompat <- function(x) {
+  if (is_html_output()) {
+    x
+  } else {
+    as_flextable(x)
+  }
+}
+
+fs <- Vectorize(function(x) {
+    if (is.na(x)) {
+      ""
+    } else if (x < 0.001) {
+      sprintf("%s ***", scientific(x, 1))
+    } else if (x == 0.001) {
+      sprintf("%.3f ***", x)
+    } else if (x < 0.01) {
+      sprintf("%.3f ** ", x)
+    } else if (x < 0.05) {
+      sprintf("%.3f *  ", x)
+    } else {
+      sprintf("%.3f    ", x)
+    }
+})
+
+printmod <- function (...) {
+  #fs <- function(x) ifelse(x < 0.001, scientific(x, 1), sprintf("%.3f", x))
+  if (...length() == 2) {
+    t1 = tbl_regression(..1, pvalue_fun = fs)
+    t2 = tbl_regression(..2, pvalue_fun = fs)
+    tbl_merge(
+      tbls = list(t1, t2),
+      tab_spanner = c("**Without interactions**", "**With interactions**")
+    ) %>% wordcompat
+  } else {
+    tbl_regression(..1, pvalue_fun = fs) %>% wordcompat
+  }
+}
+
 if (!dir.exists(here(wdir))) dir.create(here(wdir), recursive = T)
 if (!dir.exists(here(sprintf("%s/plots", wdir)))) dir.create(here(sprintf("%s/plots", wdir)))
 if (!dir.exists(here(sprintf("%s/stats", wdir)))) dir.create(here(sprintf("%s/stats", wdir)))
+
 saveplot <- function(output, ...) {
   ggsave(sprintf("%s/%s", here(wdir), output), ...)
 }
@@ -48,6 +91,12 @@ if (sens == "agesensitivity") {
   scores %<>% simple_ages
   scores_std %<>% simple_ages
 }
+
+prettyvar <- . %>%
+  rename(age = aaoaae2) %>%
+  rename_all(funs(str_replace(., "jointPC", "PC")))
+scores %<>% prettyvar
+scores_std %<>% prettyvar
 ```
 
 # Figure 1
@@ -58,8 +107,8 @@ There is an overall association:
 
 ```{r Fig1_aov, echo=F}
 residualize <- function(scores_std) {
-  confound_model <- lm(PRS_1e_minus05 ~ sex + jointPC1 + jointPC2 + jointPC3 +
-    jointPC4 + jointPC5 + jointPC6 + jointPC7 + jointPC8 + jointPC9 + jointPC10,
+  confound_model <- lm(PRS_1e_minus05 ~ sex + PC1 + PC2 + PC3 +
+    PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
     data = scores_std)
   mutate(scores_std, residualized = predict(confound_model) %>% unlist)
 }
@@ -139,7 +188,7 @@ add_quanta <- function(df, tail = 0.1) {
 }
 
 make_oddsratios <- function(scores, model_extras = "") {
-  ten_pcs <- paste(paste0("jointPC", 1:10), collapse = " + ")
+  ten_pcs <- paste(paste0("PC", 1:10), collapse = " + ")
 
   mod_extremes <- function(df, model, model_extras) {
     mod_e <- sprintf("status10 ~ %s + %s + sex%s",
@@ -326,10 +375,10 @@ apcommon <- scores_std %>%
   e4lab %>%
   filter(APOE != 24) %>%
   mutate(Status = all_status) %>%
-  filter(!is.na(all_status10 + aaoaae2))
+  filter(!is.na(all_status10 + age))
 
 ageplot <- apcommon %>%
-  ggplot() + aes(x = aaoaae2, y = PRS_1e_minus05, color = Status) +
+  ggplot() + aes(x = age, y = PRS_1e_minus05, color = Status) +
   geom_point(size = 0.01) + geom_smooth(method = "lm") +
   xlab("Age") + ylab("PRS") +
   ggtitle("(a) Effect of age and APOE on PRS") +
@@ -342,19 +391,17 @@ saveplot("plots/ageplot.pdf", plot = ageplot, height = 7, width = 7)
 ageplot
 ```
 
-```{r, include=F}
-printmod <- function (...) tab_model(..., digits = 4, emph.p = T, p.style= "scientific_stars", digits.p = 2)
-```
 
 Age significantly predicts PRS, even when accounting for AD status:
 ```{r, echo=F}
-age_lm_nocc <- lm(PRS_1e_minus05 ~ aaoaae2 + APOE + sex + jointPC1 + jointPC2 + jointPC3 +
-  jointPC4 + jointPC5 + jointPC6 + jointPC7 + jointPC8 + jointPC9 + jointPC10,
+age_lm_nocc <- lm(PRS_1e_minus05 ~ age + APOE + sex + 
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
   data = scores_std)
-age_lm <- lm(PRS_1e_minus05 ~ aaoaae2 + APOE + all_status + sex +
-  jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 + jointPC7 +
-  jointPC8 + jointPC9 + jointPC10, data = scores_std)
+age_lm <- lm(PRS_1e_minus05 ~ age + APOE + all_status + sex +
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
+  data = scores_std)
 printmod(age_lm_nocc, age_lm)
+
 ```
 
 There is no colinearity:
@@ -399,13 +446,13 @@ intplot_common <- function(plt) {
 ### Figure 2b: Case Associations:
 Age is associated with PRS, but only in E4 carriers:
 ```{r, echo=F}
-lm_case_nointeract <- lm(PRS_1e_minus05 ~ aaoaae2 + E4strat + sex + 
-  jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 +
-  jointPC7 + jointPC8 + jointPC9 + jointPC10, data = case_age_strat)
+lm_case_nointeract <- lm(PRS_1e_minus05 ~ age + E4strat + sex + 
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
+  data = case_age_strat)
 
-lm_case_interact <- lm(PRS_1e_minus05 ~ aaoaae2 * E4strat + sex +
-  jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 +
-  jointPC7 + jointPC8 + jointPC9 + jointPC10, data = case_age_strat)
+lm_case_interact <- lm(PRS_1e_minus05 ~ age * E4strat + sex +
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
+  data = case_age_strat)
 
 printmod(lm_case_nointeract, lm_case_interact)
 ```
@@ -428,8 +475,8 @@ cases333444 <- age_strat %>%
 
 casese4 <- cases333444 %>% filter(E4strat == "APOE4 carrier")
 
-bottom_ages_e4 <- casese4 %>% filter(prs_top == 1) %>% pull(aaoaae2)
-top_ages_e4 <- casese4 %>% filter(prs_top == 0) %>% pull(aaoaae2)
+bottom_ages_e4 <- casese4 %>% filter(prs_top == 1) %>% pull(age)
+top_ages_e4 <- casese4 %>% filter(prs_top == 0) %>% pull(age)
 
 t.test(bottom_ages_e4, top_ages_e4)
 ```
@@ -438,8 +485,8 @@ That effect is still there when restricting to e3e4 only:
 ```{r, echo=F}
 cases34 <- casese4 %>% filter(APOE == 34)
 
-bottom_ages_e3e4 <- cases34 %>% filter(prs_top == 1) %>% pull(aaoaae2)
-top_ages_e3e4 <- cases34 %>% filter(prs_top == 0) %>% pull(aaoaae2)
+bottom_ages_e3e4 <- cases34 %>% filter(prs_top == 1) %>% pull(age)
+top_ages_e3e4 <- cases34 %>% filter(prs_top == 0) %>% pull(age)
 
 t.test(bottom_ages_e3e4, top_ages_e3e4)
 ```
@@ -448,12 +495,12 @@ t.test(bottom_ages_e3e4, top_ages_e3e4)
 Age is associated with PRS and there is no interaction with E4 carriership.
 
 ```{r, echo=F}
-lm_ctrl_nointeract <- lm(PRS_1e_minus05 ~ aaoaae2 + E4strat + sex +
-  jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 +
-  jointPC7 + jointPC8 + jointPC9 + jointPC10, data = ctrl_age_strat)
-lm_ctrl_interact <- lm(PRS_1e_minus05 ~ aaoaae2 * E4strat + sex +
-  jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 +
-  jointPC7 + jointPC8 + jointPC9 + jointPC10, data = ctrl_age_strat)
+lm_ctrl_nointeract <- lm(PRS_1e_minus05 ~ age + E4strat + sex +
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
+  data = ctrl_age_strat)
+lm_ctrl_interact <- lm(PRS_1e_minus05 ~ age * E4strat + sex +
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10,
+  data = ctrl_age_strat)
 printmod(lm_ctrl_nointeract, lm_ctrl_interact)
 ```
 
@@ -492,12 +539,10 @@ fig2 %>% grid::grid.draw()
 
 Age, sex, and APOE are associated with status, but age and prs exert their effect through interaction only.
 ```{r, echo=F}
-status_glm_sa <- glm(all_status10 ~ aaoaae2 * PRS_1e_minus05 * E4strat + sex +
-  jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 + jointPC7 +
-  jointPC8 + jointPC9 + jointPC10, data = age_strat)
-status_glm <- glm(all_status10 ~ aaoaae2 + PRS_1e_minus05 + E4strat + sex +
-  jointPC1 + jointPC2 + jointPC3 + jointPC4 + jointPC5 + jointPC6 + jointPC7 +
-  jointPC8 + jointPC9 + jointPC10, data = age_strat)
+status_glm_sa <- glm(all_status10 ~ age * PRS_1e_minus05 * E4strat + sex +
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = age_strat)
+status_glm <- glm(all_status10 ~ age + PRS_1e_minus05 + E4strat + sex +
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = age_strat)
 printmod(status_glm, status_glm_sa)
 ```
 
@@ -597,7 +642,7 @@ oddsratio_agecont <- scores_std %>%
   mutate(model = dplyr::recode(model,
     "all_status10" = "All ctrl (age cont)",
     "status10" = "90+ ctrl (age cont)")) %>%
-  make_oddsratios(" + aaoaae2")
+  make_oddsratios(" + age")
 
 oddsratios <- bind_rows(oddsratio_noagecont, oddsratio_agecont)
 
