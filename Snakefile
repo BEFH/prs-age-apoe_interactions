@@ -15,12 +15,10 @@ localrules: all, download_progs
 
 rule all:
     input:
-        expand('output/PRS_{apoerem}_{prsset}.prsice',
-               apoerem=['noAPOE', 'withAPOE'],
-               prsset=['superagers', 'nonorthwell']),
-        expand('analysis/{sensitivity}_report.html',
+        expand('analysis/{sensitivity}_noAPOE.report.html',
                sensitivity = ['agesensitivity', 'primary']),
-        'output/scores+phenos_withAPOE.Rdata'
+        expand('analysis/{sensitivity}_withAPOE.report.html',
+               sensitivity = 'primary')
 
 '''
 Filter ADGC phenotypes to new cohorts since Lambert et al. 2013
@@ -485,6 +483,17 @@ rule run_analyses:
         thresh_standard = 'output/PRS_noAPOE_nonorthwell.prsice',
     params:
         outdir = 'analysis/{sensitivity}'
-    output: "analysis/{sensitivity}_report.html"
+    output: 'analysis/{sensitivity}_noAPOE.report.html'
     conda: 'rpyenv.yaml'
     script: 'scripts/analysis/main.Rmd' #'scripts/analysis/main.R'
+
+rule run_analyses_APOE:
+    input:
+        scores = 'output/scores+phenos_withAPOE.Rdata',
+        thresh_superager = 'output/PRS_withAPOE_superagers.prsice',
+        thresh_standard = 'output/PRS_withAPOE_nonorthwell.prsice',
+    params:
+        outdir = 'analysis/{sensitivity}_APOE'
+    output: 'analysis/{sensitivity}_withAPOE.report.html'
+    conda: 'rpyenv.yaml'
+    script: 'scripts/analysis/APOE.Rmd'
