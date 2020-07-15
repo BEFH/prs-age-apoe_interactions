@@ -1,4 +1,5 @@
 #!/usr/bin/env Rscript
+
 library(readr)
 suppressPackageStartupMessages(library(dplyr))
 suppressPackageStartupMessages(library(magrittr))
@@ -7,7 +8,10 @@ suppressPackageStartupMessages(library(tidyr))
 suppressPackageStartupMessages(library(ggplot2))
 
 #logging:
-logs <- file(snakemake@log[[1]])
+logf <- snakemake@log[[1]]
+if (file.exists(logf)) file.remove(logf)
+file.create(logf)
+logs <- file(logf)
 sink(logs, append = T)
 sink(logs, append = T, type = "message")
 

@@ -7,7 +7,10 @@ suppressPackageStartupMessages(library(tidyr))
 
 
 #logging:
-logs <- file(snakemake@log[[1]])
+logf <- snakemake@log[[1]]
+if (file.exists(logf)) file.remove(logf)
+file.create(logf)
+logs <- file(logf)
 sink(logs, append = T)
 sink(logs, append = T, type = "message")
 
