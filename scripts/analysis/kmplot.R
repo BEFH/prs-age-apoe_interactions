@@ -2,10 +2,22 @@
 
 pacman::p_load(
   dplyr, readr, tidyr, magrittr, forcats, stringr,
-  survival, survminer, broom, ggplot2)
+  survival, survminer, broom, ggplot2, here)
 
-load("prs_analysis/scores_and_phenos_noAPOE.Rdata")
-setwd("plots/kaplan_meier")
+if (exists("snakemake")) {
+  load(here(snakemake@input[[1]]))
+  setwd(here(snakemake@params[["outdir"]]))
+  #logging:
+  logf <- here(snakemake@log[[1]])
+  if (file.exists(logf)) file.remove(logf)
+  file.create(logf)
+  logs <- file(logf)
+  sink(logs, append = T)
+  sink(logs, append = T, type = "message")
+} else {
+  load(here("output/scores+phenos_withAPOE.Rdata"))
+  setwd(here("analysis/primary"))
+}
 
 unpack_kv <- function(df, col) { #Unpack kv pairs like from summary
   dplyr::mutate(df, KVpairs = str_split(!!sym(col), ", ")) %>%
@@ -68,7 +80,9 @@ surv_mod_unstrat %>% summary_with_function %>% print
 message("Test for proportionality of residuals:")
 cox.zph(surv_mod_unstrat) %>% print
 
+pdf("plots/coxzph.pdf")
 ggcoxzph(cox.zph(surv_mod_unstrat))
+dev.off()
 
 message("unstratified survival ANOVA:")
 anova(surv_mod_unstrat) %>% print
@@ -86,7 +100,7 @@ kmplot <- surv_mod %>%
     coord_cartesian(xlim = c(60, 110), ylim = c(0, 1.01), expand = F) +
     theme_bw() +
     labs(x = "Age", y = "Proportion Unaffected",
-         color = "PRS stratum", linetype = "APOE genotype") +
+         linetype = "PRS stratum", color = "APOE genotype") +
     scale_color_manual(values = c("#B45ADC", "#E66100")) +
     scale_linetype_manual(values =
       c("Middle 80% of PRS" = "solid",
@@ -95,5 +109,5 @@ kmplot <- surv_mod %>%
     theme(legend.position = c(0.15, 0.2),
           plot.margin = unit(c(5.5, 11, 5.5, 5.5), "points"))
 
-ggsave("kmplot.pdf", plot = kmplot, height = 7, width = 7)
-ggsave("kmplot.png", plot = kmplot, height = 7, width = 7)
+ggsave("plots/kmplot.pdf", plot = kmplot, height = 7, width = 7)
+ggsave("plots/kmplot.png", plot = kmplot, height = 7, width = 7)

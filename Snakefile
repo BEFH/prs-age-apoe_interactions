@@ -17,8 +17,8 @@ rule all:
     input:
         expand('analysis/{sensitivity}_noAPOE.report.html',
                sensitivity = ['agesensitivity', 'primary']),
-        expand('analysis/{sensitivity}_withAPOE.report.html',
-               sensitivity = 'primary')
+        'analysis/primary_withAPOE.report.html',
+        'analysis/primary/plots/kmplot.pdf'
 
 '''
 Filter ADGC phenotypes to new cohorts since Lambert et al. 2013
@@ -497,3 +497,12 @@ rule run_analyses_APOE:
     output: 'analysis/{sensitivity}_withAPOE.report.html'
     conda: 'rpyenv.yaml'
     script: 'scripts/analysis/APOE.Rmd'
+
+rule run_analyses_kmplot:
+    input: 'output/scores+phenos_noAPOE.Rdata'
+    params:
+        outdir = 'analysis/{sensitivity}'
+    output: 'analysis/{sensitivity}/plots/kmplot.pdf'
+    log: 'analysis/{sensitivity}/stats/survival.log'
+    conda: 'rpyenv.yaml'
+    script: 'scripts/analysis/kmplot.R'
