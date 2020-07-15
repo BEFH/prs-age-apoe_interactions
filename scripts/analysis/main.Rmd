@@ -700,7 +700,12 @@ oddsratio_agecont <- scores_std %>%
 
 oddsratios <- bind_rows(oddsratio_noagecont, oddsratio_agecont)
 
-plot_oddsratios(oddsratios)
+or_breaks_2 <- seq(0, round(max(oddsratios$upper)/10)*10, 10)
+or_breaks_2 <- c(1:9, or_breaks_2[2:length(or_breaks_2)])
+
+plot_oddsratios(oddsratios) +
+  scale_x_continuous(trans = log_trans(), breaks = or_breaks_2,
+    labels = c(as.character(or_breaks_2)))
 saveplot("plots/OR.png", width = 7, height = 2.5)
 saveplot("plots/OR.pdf", width = 7, height = 2.5)
 ```
