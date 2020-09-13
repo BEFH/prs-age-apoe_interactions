@@ -1,7 +1,7 @@
 .snake*
 input/
 output/
-data/
+data
 logs/
 merged/
 PCA/
@@ -16,3 +16,5 @@ scripts/analysis/*.docx
 plink2
 PRSice*
 *e-*.snp
+.Rhistory
+*.zip

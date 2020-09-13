@@ -15,7 +15,7 @@ if (exists("snakemake")) {
   sink(logs, append = T)
   sink(logs, append = T, type = "message")
 } else {
-  load(here("output/scores+phenos_withAPOE.Rdata"))
+  load(here("output/scores+phenos_noAPOE.Rdata"))
   setwd(here("analysis/primary"))
 }
 
@@ -64,10 +64,13 @@ prs_quantified <- scores_std %>%
                                 "APOE4 Carrier", "APOE4 Non-carrier")) %>%
   mutate(SCORE = PRS_1e_minus05) %>%
   add_quanta(0.1) %>%
-  mutate(prs_top = as.factor(prs_top) %>% fct_infreq())
+  mutate(prs_top = as.factor(prs_top) %>% fct_infreq(),
+         apoe4_carrier = factor(apoe4_carrier,
+           levels = c("APOE4 Non-carrier", "APOE4 Carrier")))
 
 surv_form_strat <- formula("Surv(age, all_status10) ~ jointPC1 + jointPC2 + strata(prs_top, apoe4_carrier, shortlabel = F)")
 surv_form_ustrat <- formula("Surv(age, all_status10) ~ jointPC1 + jointPC2 + prs_top + strata(cohort, apoe4_carrier)")
+surv_form_ustrat_full <- formula("Surv(age, all_status10) ~ jointPC1 + jointPC2 + prs_top + apoe4_carrier + prs_top:apoe4_carrier + strata(cohort)")
 
 message("Stratified survival Cox proportional hazards model:")
 surv_mod <- survival::coxph(surv_form_strat, data = prs_quantified)
@@ -86,6 +89,25 @@ dev.off()
 
 message("unstratified survival ANOVA:")
 anova(surv_mod_unstrat) %>% print
+
+message("Fully unstratified survival Cox proportional hazards model:")
+surv_mod_unstrat_full <-
+  survival::coxph(surv_form_ustrat_full, data = prs_quantified)
+surv_mod_unstrat_full %>% summary_with_function %>% print
+
+surv_mod_unstrat_full %>% tidy
+
+message("Test for proportionality of residuals:")
+cox.zph(surv_mod_unstrat_full) %>% print
+
+ggcoxzph(cox.zph(surv_mod_unstrat_full))
+
+ggcoxzph(cox.zph(surv_mod_unstrat_full))
+
+message("unstratified survival ANOVA:")
+anova(surv_mod_unstrat_full) %>% print
+
+anova(surv_mod_unstrat_full) %>% tidy
 
 kmplot <- surv_mod %>%
   survfit %>%

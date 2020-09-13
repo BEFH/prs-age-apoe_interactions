@@ -3,9 +3,9 @@ title: "Main Analyses"
 author: "Brian Fulton-Howard, Robert Adelson, Alison Goate, Yun Freudenberg"
 date: "7/14/2020"
 output:
+  word_document: default
   rmarkdown::html_document:
     theme: spacelab
-  word_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -589,9 +589,9 @@ fig2 %>% grid::grid.draw()
 Age, sex, and APOE are associated with status, but age and prs exert their effect through interaction only.
 ```{r, echo=F}
 status_glm_sa <- glm(all_status10 ~ age * PRS_1e_minus05 * E4strat + sex +
-  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = age_strat)
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = age_strat, family = binomial)
 status_glm <- glm(all_status10 ~ age + PRS_1e_minus05 + E4strat + sex +
-  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = age_strat)
+  PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = age_strat, family = binomial)
 printmod(status_glm, status_glm_sa)
 ```
 
@@ -605,6 +605,41 @@ No colinearity:
 status_glm %>% vif %>% as_tibble(rownames = "coef") %>% kable
 ```
 # Supplements
+
+## Logistic models of the effect of *APOE4*, covarying by sex and 10 PCs
+
+Modeling the effect of E4 stratum with 89- controls and with 90+ controls:
+
+```{r, echo=F}
+E4_glm_90plus <- age_strat %>% 
+  filter(status_superage %in% c("case", "90+ control")) %>%
+  glm(all_status10 ~ E4strat + sex +
+    PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = ., family = binomial)
+
+E4_glm_89minus <- age_strat %>% 
+  filter(status_superage %in% c("case", "89- control")) %>%
+  glm(all_status10 ~ E4strat + sex +
+    PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = ., family = binomial)
+
+printmod(E4_glm_89minus, E4_glm_90plus, model_names = c("M1: 89- controls", "M2: 90+ controls"))
+```
+
+Modeling the effect of E4 homozygosity (E3/E3 vs. E4/E4) with 89- controls and with 90+ controls:
+
+```{r, echo=F}
+E4_glm_90plus_hom <- age_strat %>% 
+  filter((status_superage %in% c("case", "90+ control")) & (APOE %in% c(33, 44))) %>%
+  glm(all_status10 ~ E4strat + sex +
+    PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = ., family = binomial)
+
+E4_glm_89minus_hom <- age_strat %>% 
+  filter((status_superage %in% c("case", "89- control")) & (APOE %in% c(33, 44))) %>%
+  glm(all_status10 ~ E4strat + sex +
+    PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + PC7 + PC8 + PC9 + PC10, data = ., family = binomial)
+
+
+printmod(E4_glm_89minus_hom, E4_glm_90plus_hom, model_names = c("M1: 89- controls", "M2: 90+ controls"))
+```
 
 ## Threshold plot
 
